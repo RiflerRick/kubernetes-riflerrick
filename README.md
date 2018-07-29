@@ -55,7 +55,21 @@ kops edit cluster kubernetes.riflerrick.tk --state=s3://kops-state-b215b
 For creating the cluster we can use the following command
 
 ```bash
-kops update cluster kubernetes.riflerrick.tk --yes --state=s3://kops-state-b215b
+kops update cluster kubernetes.riflerrick.tk --state=s3://kops-state-b215b --yes
 
 # the state needs to be specified as well
+```
+The `--yes` option actually applies the changes onto aws. 
+
+Cluster creation may actually take some time. We can validate the cluster using the following command
+
+```bash
+kops validate cluster --state=s3://kops-state-b215b
+```
+
+Using `kubectl` now we can fetch the nodes that are running in aws.
+Make sure that the context of kubectl is pointing to the kops context. The context of kubernetes can be checked using the following command
+
+```bash
+kubectl config get-contexts
 ```
