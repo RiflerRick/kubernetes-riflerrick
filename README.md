@@ -106,3 +106,6 @@ kops delete cluster kubernetes.riflerrick.tk --state=s3://kops-state-b215b
 ```
 The previous command prepares the delete operation but does not actually delete the cluster straightaway. For that we need to use the `--yes` option
 
+Few useful commands:
+-------------------------------------------------
+
