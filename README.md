@@ -216,4 +216,7 @@ There are a few things to note in this file.
 
 ## Concepts
 
-![](https://drive.google.com/file/d/1_rlyhYwT8PWGFi4_gqubCNCAsJGGCX0z/view)
+![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/kube-basics.jpg)
+
+
+
