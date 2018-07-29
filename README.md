@@ -106,37 +106,8 @@ kops delete cluster kubernetes.riflerrick.tk --state=s3://kops-state-b215b
 ```
 The previous command prepares the delete operation but does not actually delete the cluster straightaway. For that we need to use the `--yes` option
 
-Few useful commands:
+
 ---
-
-```bash
-kubectl get pods
-# getting all pods
-
-kubectl describe pod <pod>
-# describing one pod
-
-kubectl expose pod <pod> --port=444 --name=<name>
-# expose a port of a pod(creates a new service)
-
-kubectl port-forward <pod> <local-machine port>
-# port forward the exposed port on the pod to the local machine
-
-kubectl attach <podname> -i 
-# attach to the pod
-
-kubectl exec <pod> -- <command>
-# executing commands on the pod. Basically this would execute commands on the container. 
-# So in case, the pod contains multiple containers we can specify the container using -c option.
-# by default it would execute the command on the first container
-
-kubectl label pods <pod> mylabel=helloworldlabel
-# for labelling pods
-
-kubectl run -i --tty busybox --image=busybox --restart=Never -- sh
-# used for debugging, we can actually run a pod with the shell
-```
-
 An example of a kubernetes pod deployment file
 
 ```yml
@@ -185,7 +156,16 @@ From the deployment file we can see that we are going to expose port 3000 of the
     ```bash
     minikube service nodehelloworld-service --url
     ```
-    
 
+Once the pod is available we can use the following commands on them:
+```bash
+kubectl attach nodehelloworld.example.com
+# this command is used to attach a terminal to the process running inside the pod. So for instance if we have a django development server running inside the pod, we will be able to see the logs if we attach the pod using kubectl
 
+kubectl exec nodehelloworld.example.com -- ls /app
+# with exec we can execute commands inside a running pod
+
+kubectl run -i --tty busybox --image=busybox --restart=Never -- sh
+# this would enable us to create another deployment start the pod and run commands in that pod
+```   
 
