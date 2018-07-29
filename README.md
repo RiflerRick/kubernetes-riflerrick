@@ -137,5 +137,55 @@ kubectl run -i --tty busybox --image=busybox --restart=Never -- sh
 # used for debugging, we can actually run a pod with the shell
 ```
 
+An example of a kubernetes pod deployment file
+
+```yml
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: nodehelloworld.example.com
+  labels:
+    app: helloworld
+spec:
+  containers:
+  - name: k8s-demo
+    image: wardviaene/k8s-demo
+    ports:
+    - name: nodejs-port
+      containerPort: 3000
+```
+
+Note here that we are creating a pod by the name of `nodehelloworld.example.com`, The name of the app would be `helloworld` having only one container running the image `wardviaene/k8s-demo`. The exposed port is 3000. 
+
+In order to create this deployment we can use the following command
+```bash
+kubectl create -f first-app/helloworld.yml # -f is obviously the filename
+```
+
+In order to check the pod we can `describe` it.
+```bash
+kubectl describe pod nodehelloworld.example.com
+```
+
+If we actually describe a pod, at the very bottom we will be able to see the events of the pod. The events essentially include events like pulling the image and essentially setting up the container.
+
+From the deployment file we can see that we are going to expose port 3000 of the container. Now we can access that app in 2 ways:
+- port-forwarding: 
+    ```bash
+    kubectl port-forward nodehelloworld.example.com 8081:3000 # basically port 3000 on the pod will be forwarded to port 8081 in the localmachine
+    ```
+
+- using a service: 
+    ```bash
+    kubectl expose pod nodehelloworld.example.com --type=NodePort --name nodehelloworld-service
+    ```
+    Note that we will need to check the port on which the service exposed the port. We can do so using the following command
+
+    On minikube we can get the ip and the port in the following way:
+    ```bash
+    minikube service nodehelloworld-service --url
+    ```
+    
+
 
 
