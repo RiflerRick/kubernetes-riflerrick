@@ -216,4 +216,4 @@ There are a few things to note in this file.
 
 ## Concepts
 
-![](https://drive.google.com/open?id=1_rlyhYwT8PWGFi4_gqubCNCAsJGGCX0z)
+![](https://drive.google.com/file/d/1_rlyhYwT8PWGFi4_gqubCNCAsJGGCX0z/view)
