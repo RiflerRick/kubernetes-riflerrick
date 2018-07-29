@@ -44,6 +44,8 @@ kops create cluster --name=kubernetes.riflerrick.tk --state=s3://kops-state-b215
 # node-size: aws specification of the ec2 instance for the nodes
 # master-size: aws specification of the ec2 instance for the master
 # dns-zone: dns configured for reaching this cluster
+
+# Note that a custom security group is also created along with cluster.
 ```
 Just after executing the previous command, kops will not immediately create the cluster. kops will allow us to first review the changes that will be made before actually creating the cluster.
 
@@ -73,3 +75,34 @@ Make sure that the context of kubectl is pointing to the kops context. The conte
 ```bash
 kubectl config get-contexts
 ```
+To change the current context use
+
+```bash
+kubectl config use-context kubernetes.riflerrick.tk
+```
+
+Running a deployment in the cluster
+```bash
+kubectl run hello-minikube --image=k8s.gcr.io/echoserver:1.4 --port=8080
+```
+
+The previous command would create a deployment for the image `k8s.gcr.io/echoserver:1.4` and expose the port 8080 in the container where the image would be running.
+
+We can then have a service of type `NodePort` that can expose the running container to the outside world.
+```bash
+kubectl expose deployment hello-minikube --type=NodePort
+```
+
+Next we can get the services using the following command
+```bash
+kubectl get services
+```
+
+This would list out the `NodePort` service. Note that the nodeport service exposes the port only on the worker nodes and not on the master.  
+
+We can delete the cluster using the following command
+```bash
+kops delete cluster kubernetes.riflerrick.tk --state=s3://kops-state-b215b
+```
+The previous command prepares the delete operation but does not actually delete the cluster straightaway. For that we need to use the `--yes` option
+
