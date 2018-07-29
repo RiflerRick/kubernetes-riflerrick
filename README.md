@@ -107,5 +107,34 @@ kops delete cluster kubernetes.riflerrick.tk --state=s3://kops-state-b215b
 The previous command prepares the delete operation but does not actually delete the cluster straightaway. For that we need to use the `--yes` option
 
 Few useful commands:
--------------------------------------------------
+---
+
+```bash
+kubectl get pods
+# getting all pods
+
+kubectl describe pod <pod>
+# describing one pod
+
+kubectl expose pod <pod> --port=444 --name=<name>
+# expose a port of a pod(creates a new service)
+
+kubectl port-forward <pod> <local-machine port>
+# port forward the exposed port on the pod to the local machine
+
+kubectl attach <podname> -i 
+# attach to the pod
+
+kubectl exec <pod> -- <command>
+# executing commands on the pod. Basically this would execute commands on the container. 
+# So in case, the pod contains multiple containers we can specify the container using -c option.
+# by default it would execute the command on the first container
+
+kubectl label pods <pod> mylabel=helloworldlabel
+# for labelling pods
+
+kubectl run -i --tty busybox --image=busybox --restart=Never -- sh
+# used for debugging, we can actually run a pod with the shell
+```
+
 
