@@ -1,4 +1,4 @@
-### Commands
+## Commands
 
 ```bash
 minikube start # for starting the minikube cluster. This starts a VM in the background
@@ -26,7 +26,7 @@ kubectl config use-context <name of the context>
 kubectl get nodes # for getting all nodes 
 ```
 
-#### Kops
+### Kops
 Kubernetes operations
 
 To setup kubernetes as a production cluster on aws, we can use kops. 
@@ -106,7 +106,7 @@ kops delete cluster kubernetes.riflerrick.tk --state=s3://kops-state-b215b
 ```
 The previous command prepares the delete operation but does not actually delete the cluster straightaway. For that we need to use the `--yes` option
 
-
+### Running an app in minikube
 ---
 An example of a kubernetes pod deployment file
 
@@ -169,3 +169,51 @@ kubectl run -i --tty busybox --image=busybox --restart=Never -- sh
 # this would enable us to create another deployment start the pod and run commands in that pod
 ```   
 
+### Running an app using kops in AWS
+
+helloworld.yml file
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodehelloworld.example.com
+  labels:
+    app: helloworld
+spec:
+  containers:
+  - name: k8s-demo
+    image: wardviaene/k8s-demo
+    ports:
+    - name: nodejs-port
+      containerPort: 3000
+```
+It is the same helloworld.yml file as before
+One thing to note here is that under the `ports` tag there is a name given. This name can be used later on inside the service. 
+
+Next lets take a look at the service of type `LoadBalancer` that we will use infront of our kubernetes cluster on aws. Such a load balancer when deployed with kops will actually create an ELB on aws.
+
+```yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld-service
+spec:
+  ports:
+  - port: 80
+    targetPort: nodejs-port
+    protocol: TCP
+  selector:
+    app: helloworld
+  type: LoadBalancer
+```
+Note here that we are using the `targetPort` as `nodejs-port`.
+
+There are a few things to note in this file.
+- **`ports`**
+  - `port`: there are 3 directives under the ports section. The first one defines the port of the service. This means when one service needs to communicate with another service in the same kubernetes cluster, it would use this port.
+  - `targetPort`: targetPort is the port on the pod where `kubeproxy` must contact in order to find the running containers. In other words if we want our container to be accessible by this service we would have to listen on the targetPort(given that the container has exposed this same port)
+  - `protocol`: just protocol
+
+## Concepts
+
+![](https://drive.google.com/open?id=1_rlyhYwT8PWGFi4_gqubCNCAsJGGCX0z)
