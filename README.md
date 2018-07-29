@@ -31,8 +31,10 @@ Kubernetes operations
 
 To setup kubernetes as a production cluster on aws, we can use kops. 
 
+Note: for kops to work `aws` cli must be setup in the local machine first and the user configured must have permissions to create ec instances on the aws as kops will attempt to create an aws cluster itself
+
 ```bash
-kops create cluster --name=kubernetes.riflerrick.tk --state=s3://kops-state-b215b --zones=ap-south-1a --node-count=2 --node-size=t2.micro --master-size=t2.micro --dns-zone=kubernetes.riflerick.tk 
+kops create cluster --name=kubernetes.riflerrick.tk --state=s3://kops-state-b215b --zones=ap-south-1a --node-count=2 --node-size=t2.micro --master-size=t2.micro --dns-zone=kubernetes.riflerrick.tk 
 # The previous command is to run a kubernetes cluster on aws
 
 # name: The name of the cluster in our case is the same as the domain name
