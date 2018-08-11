@@ -199,8 +199,9 @@ metadata:
   name: helloworld-service
 spec:
   ports:
-  - port: 80
-    targetPort: nodejs-port
+  - port: 80 # this is the port of the service
+    targetPort: nodejs-port # this is the port on the pod where kubeproxy must connect in order to 
+    # find the running containers
     protocol: TCP
   selector:
     app: helloworld
@@ -211,12 +212,99 @@ Note here that we are using the `targetPort` as `nodejs-port`.
 There are a few things to note in this file.
 - **`ports`**
   - `port`: there are 3 directives under the ports section. The first one defines the port of the service. This means when one service needs to communicate with another service in the same kubernetes cluster, it would use this port.
-  - `targetPort`: targetPort is the port on the pod where `kubeproxy` must contact in order to find the running containers. In other words if we want our container to be accessible by this service we would have to listen on the targetPort(given that the container has exposed this same port)
+  - `targetPort`: targetPort is the port on the **pod** where `kubeproxy` must contact in order to find the running containers. In other words if we want our container to be accessible by this service we would have to listen on the targetPort(given that the container has exposed this same port)
   - `protocol`: just protocol
 
 ## Concepts
 
 ![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/kube-basics.jpg)
 
+Kubernetes is called a platform of platforms. What this means is that kubernetes provides us with a platform for managing different platforms. It provides an abstraction over the platforms that we generally use for deploying our application to easily manage those platforms. 
 
+Shown in the picture are 2 nodes(machines) with a couple of pods inside them. The atomic unit of kubernetes is a pod. A pod can have multiple containers running inside it. These containers can communicate easily with each other. They can just use the port number to communicate with each other. Pods within a cluster can also communicate with each other but that needs to go over the network. 
 
+On the nodes we also have a kubelet and a kubeproxy service running. kubelet basically enables kubernetes to launch the pods so it connects to the master node in the cluster to get this information. The kubeproxy is going to feed the information about what pods are there in the current node to iptables. iptables is a firewall of linux.
+
+Services are means to communicate between pods. So for instance in the diagram we have a load balancer which is essentially a service. This load balancer service if deployed will essentially spin an elastic load balancer with kops for instance. The load balancer may forward the traffic to any of the nodes' iptables, however the actual pod to connect to may be residing in a different node, it is then the responsibility of iptables to route the traffic to that other node.
+
+So for instance if we were to describe how a pod definition would be in terms of a yaml file:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodehelloworld.example.com
+  labels:
+    app: helloworld # other kubernetes resources will use this label in order to find this pod
+  spec:
+    containers:
+    - name: k8s-demo
+      image: wardviaene/k8s-demo
+      ports:
+        - containerPort: 3000
+```
+Under the `spec` the `containers` specification lists the specification of each container that will be run inside the pod. 
+
+### Scaling our pods
+
+if our application is stateless it is possible to horizontally scale it. stateless would mean that our application would not write any local files and it would not keep any session data. If our application would write any data locally that would mean that each pod would be out of sync as each pod is writing data locally and therefore it would not be horizontally scalable. If a request to one pod would yield the same result as making a request to another pod them we can say that our pods are stateless. This obviously means that all databases are stateful as they obviosuly write local files. However in case of web applications, they can be made stateless. Session management and the like can be done outside the container and the web application would be stateless. Any files that need to be saved cannot be saved locally within the container.
+
+Scaling in kubernetes is done using the Replication Controller. The replication controller will ensure that a specified number of pods will run at all times. Pods created by the replica controller will automatically get replaced if they fail, get deleted or are terminated. For instance going back to our example app, we can use replication controller in the following way:
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: helloworld-controller
+spec:
+  replicas: 2
+  selector:
+    app: helloworld # this tells kubernetes that this replication controller is meant for the app 
+    # by the label name app as helloworld
+  template:
+    metadata:
+      labels:
+        app: helloworld
+    spec:
+      containers:
+      - name: k8s-demo
+        image: wardviaene/k8s-demo
+        ports:
+        - name: nodejs-port
+          containerPort: 3000
+``` 
+What the replication controller is going to do in this case is that it is going to run the pod defined in it 2 times.
+If we now deploy a replication controller using `kubectl create -f helloworld-controller.yaml` given that the name of the replication controller yaml file is `helloworld-controller.yaml`
+
+After deployment we can see the pods using 
+```
+kubectl get pods
+```
+This would display all the pods that are running and in this case we would see two pods running as the replication factor given is 2. Now in order to see the status of the pods we can describe the pods using the following command
+```
+kubectl describe pod <name of the pod>
+```
+The interesting thing now is that if we try to delete one pod, the replication controller will immediately swing into action and start running another pod to replace the old pod so that we always have 2 healthy pods running at all times.
+```
+kubectl delete pod <name of the pod>
+kubectl get pods
+```
+on getting the pods we will see that although the status of one pod will be terminating, another pod would have taken its place
+It is also possible to scale the pods using the `kubectl scale` command in the following way
+```
+kubectl scale --replicas=4 -f helloworld-controller.yaml
+```
+given that the name of the deployment yaml file is `helloworld-controller.yaml`. This would create 4 replicas of the pod.
+One thing to note here is that if we had previously running pods and we use the scale command, kubernetes is smart enough not to kill the previously running pods and start them again, but to actually start 2 new pods if 2 pods were already running.
+If we wanted to get the name of the replication controller, it can be done in the following way
+```
+kubectl get rc
+```
+It is possible to scale our pods using the name of the replication controller as well in the following way
+```bash
+kubectl get rc
+kubectl scale --replicas=4 rc/<name of the replication controller> # the number of replicas here is absolute, which means that if 4 replicas were already running, it would not do anything, 
+kubectl scale --replicas=1 rc/<name of the replication controller> # this would terminate 3 replicas and just run one
+```
+It is however worth mentioning one more time that replication is always possible in stateless applications.
+```
+kubectl delete rc/<name of the replication controller>
+```
