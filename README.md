@@ -246,7 +246,7 @@ Under the `spec` the `containers` specification lists the specification of each 
 
 ### Scaling our pods
 
-if our application is stateless it is possible to horizontally scale it. stateless would mean that our application would not write any local files and it would not keep any session data. If our application would write any data locally that would mean that each pod would be out of sync as each pod is writing data locally and therefore it would not be horizontally scalable. If a request to one pod would yield the same result as making a request to another pod them we can say that our pods are stateless. This obviously means that all databases are stateful as they obviosuly write local files. However in case of web applications, they can be made stateless. Session management and the like can be done outside the container and the web application would be stateless. Any files that need to be saved cannot be saved locally within the container.
+if our application is stateless it is possible to horizontally scale it. stateless would mean that our application would not write any local files and it would not keep any session data. If our application would write any data locally that would mean that each pod would be out of sync as each pod is writing data locally and therefore it would not be horizontally scalable. If a request to one pod would yield the same result as making a request to another pod them we can say that our pods are stateless. This obviously means that all databases are stateful as they obviosuly write local files. However in case of web applications, they can be made stateless. Session management and the like can be done outside the container and the web application would be stateless. Any files that need to be saved cannot be saved **locally within the container.
 
 Scaling in kubernetes is done using the Replication Controller. The replication controller will ensure that a specified number of pods will run at all times. Pods created by the replica controller will automatically get replaced if they fail, get deleted or are terminated. For instance going back to our example app, we can use replication controller in the following way:
 ```yaml
@@ -308,3 +308,109 @@ It is however worth mentioning one more time that replication is always possible
 ```
 kubectl delete rc/<name of the replication controller>
 ```
+### Replica Set
+
+Replica Set is the next generation replication controller, it supports a new selector that can do selection based on filtering according to a set of values. Replica Set is actually used by the deployment object.
+
+### Deployment
+
+A deployment declaration in k8s allows you to do app deployments and updates. When using the deployment object, you define the **`state`** of the application. Kubernetes will then make sure the cluster matches the desired state. This is fundamental to the whole idea of kubernetes and exactly the reason why kubernetes is what it is.
+
+With a deployment object the following things can be done
+- Create a deployment
+- Update a deployment
+- Do rolling updates(zero downtime deployments)
+- Roll back to a previous version of the app
+- pause/resume a deployment(that would mean that we want to roll out only a certain percentage of the running pods)
+
+An example of a deployment can be
+```yaml
+apiVersion: extension/v1beta1
+kind: Deployment
+metadata:
+  name: helloworld-deployment
+spec:
+  replicas: 3 # 3 pods will be run
+  template: 
+    metadata:
+      labels:
+        app: helloworld
+    spec: # pod specifications
+      containers:
+      - name: k8s-demo
+        image: wardviaene/k8s-demo
+        ports:
+        - containerPort: 3000 # recall that this is the exact port on the container that has been exposed
+```
+Useful commands on deployments
+- get current deployments
+  ```
+  kubectl get deployments
+  ```
+- get information of replica sets
+  ```
+  kubectl get rs
+  ```
+- show pods with labels
+  ```
+  kubectl get pods --show-labels
+  ```
+- getting the deployment status
+  ```bash
+  kubectl rollout status deployment/hellworld-deployment # given that the name of the deployment is helloworld-deployment
+  ```
+- we can change our image in a deployment in the following way
+  ```bash
+  kubectl set image deployment/<name of the deployment> k8s-demo=k8s-demo:2 # this would change the image k8s-demo to k8s-demo version 2
+  ```
+- we can edit a deployment in the following way
+  ```
+  kubectl edit deployment/<name of the deployment>s
+  ```
+- getting the history of our deployed versions can be done in the following way
+  ```
+  kubectl rollout history deployment/<name of the deployment>
+  ```
+- rollback to a previous version
+  ```
+  kubectl rollout undo deployment/<name of the deployment>
+  ```
+- rolling back to a specified version using the following command
+  ```
+  kubectl rollout undo deployment/<name of the deployment> --to-version=n
+  ```
+   other than using `deployment/<name of the deployment>` it is also possible to do 
+   `deployment <name of the deployment>`
+
+Now if we wanted to expose our deployment we would do that using a `NodePort` service in the following way
+```bash
+kubectl expose deployment <name of the deployment> --type=NodePort
+kubectl get service # would show that a nodeport type service was created
+kubectl describe service <name of the service>
+```
+On describing the service this is what we would get back
+```
+Name:                     helloworld-deployment
+Namespace:                default
+Labels:                   app=helloworld
+Annotations:              <none>
+Selector:                 app=helloworld
+Type:                     NodePort
+IP:                       10.108.200.233
+Port:                     <unset>  3000/TCP
+TargetPort:               3000/TCP
+NodePort:                 <unset>  32762/TCP
+Endpoints:                172.17.0.4:3000,172.17.0.5:3000,172.17.0.6:3000
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+```
+In order to see the url from which we can access the pod, we can use the following command
+```
+minikube service <name of the service> --urls
+```
+Note: during creation of a deployment we can use the option `--record` in order to see the changes as well. 
+
+By default the kubernetes deployment revision history is set to 2 which means only 2 entries will be shown in the revision history. We can change that by editing the deployment. We need to add the following key under deployment `spec`
+`revisionHistoryLimit`.s
+
