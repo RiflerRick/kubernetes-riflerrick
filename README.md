@@ -477,7 +477,7 @@ $ curl http://10.108.200.233:3000
 Hello World!$ 
 $ # kubectl describe service helloworld-deployment
 $ # the above command would return the following endpoints 172.17.0.4:3000,172.17.0.5:3000,172.17.0.6:3000
-$ # this means that these are infact the endpoints of the containers can be accessed from here in the following way
+$ # these are infact the ips of the pods
 $ curl http://172.17.0.4:3000
 Hello World!$ 
 $ # we can also get inside the container and access it 
