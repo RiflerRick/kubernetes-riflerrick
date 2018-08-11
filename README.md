@@ -414,3 +414,83 @@ Note: during creation of a deployment we can use the option `--record` in order 
 By default the kubernetes deployment revision history is set to 2 which means only 2 entries will be shown in the revision history. We can change that by editing the deployment. We need to add the following key under deployment `spec`
 `revisionHistoryLimit`.s
 
+### Service
+
+Basically for accessing pods
+
+An example of a service definition might be like the following
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld-service # name of the service
+spec:
+  ports:
+  - port: 31001
+    nodePort: 31001 # port on the node from where i would be able to access the pod
+    targetPort: nodejs-port # targetPort is the port on the pod where the app is running
+    protocol: TCP
+  selector: 
+    app: helloworld
+  type: NodePort
+```
+In a similar fashion used for creating deployments, we can create services
+```bash
+kubectl create -f <name of the service yaml file>
+```
+Specifying a nodeport is not mandatory, if not specified, k8s will choose a random port that is not conflicting with any other application. If however we specify the nodeport this conflict management has to be done by ourselves.
+
+```
+kubectl get svc # svc is short for service
+```
+If we go ahead and describe the service, here is what we get
+```
+Name:                     helloworld-deployment
+Namespace:                default
+Labels:                   app=helloworld
+Annotations:              <none>
+Selector:                 app=helloworld
+Type:                     NodePort
+IP:                       10.108.200.233
+Port:                     <unset>  3000/TCP
+TargetPort:               3000/TCP
+NodePort:                 <unset>  32762/TCP
+Endpoints:                172.17.0.4:3000,172.17.0.5:3000,172.17.0.6:3000
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+```
+here **IP** is the ip of the service, **Port** is the port of the service where we can access the pods
+The service obviosuly is inside the cluster which means we cannot directly access the service from the external world. 
+The **TargetPort** is the port on the pod where the container is running and the container is listening to
+The **NodePort** is the port from which we can access pod and hence the container and the app
+
+In order to get more clarity we can do the following
+
+```bash
+rajdeep@adminstrator-Latitude-3590:~/Desktop/kubernetes  (master) $ minikube ssh
+$ docker ps | grep k8s-demo
+b049a5aab2d5        wardviaene/k8s-demo          "/bin/sh -c 'npm sta…"   2 hours ago         Up 2 hours                              k8s_k8s-demo_helloworld-deployment-67bd889c49-nsz4k_default_ddbfaf69-9d79-11e8-a805-08002738fe97_0
+0dc9cadbc992        wardviaene/k8s-demo          "/bin/sh -c 'npm sta…"   2 hours ago         Up 2 hours                              k8s_k8s-demo_helloworld-deployment-67bd889c49-gw96n_default_ddbf8fc1-9d79-11e8-a805-08002738fe97_0
+6528ccc29874        wardviaene/k8s-demo          "/bin/sh -c 'npm sta…"   2 hours ago         Up 2 hours                              k8s_k8s-demo_helloworld-deployment-67bd889c49-r2j99_default_dd9af936-9d79-11e8-a805-08002738fe97_0
+$ curl http://10.108.200.233:3000
+Hello World!$ 
+$ # kubectl describe service helloworld-deployment
+$ # the above command would return the following endpoints 172.17.0.4:3000,172.17.0.5:3000,172.17.0.6:3000
+$ # this means that these are infact the endpoints of the containers can be accessed from here in the following way
+$ curl http://172.17.0.4:3000
+Hello World!$ 
+$ # we can also get inside the container and access it 
+$ docker exec -it b049a5aab2d5 bash
+root@helloworld-deployment-67bd889c49-nsz4k:/app# curl http://localhost:3000   
+Hello World!root@helloworld-deployment-67bd889c49-nsz4k:/app#
+root@helloworld-deployment-67bd889c49-nsz4k:/app# 
+root@helloworld-deployment-67bd889c49-nsz4k:/app# 
+root@helloworld-deployment-67bd889c49-nsz4k:/app# exit
+exit
+$ # since we are inside the k8s cluster, we can directly access the pod using the nodeport
+$ curl http://localhost:32762    
+Hello World!$ 
+$
+```
+The ip of the service also changes if we create a new service after deleting the old one. It is however also possible to keep that fixed as well
