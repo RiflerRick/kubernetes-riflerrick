@@ -585,4 +585,25 @@ The container state can be running, terminated or waiting
 ### Pod Lifecyle
 
 ![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/k8s_pod_lifecycle.png)
-The following diagram shows us the
+
+The following diagram shows us the pod lifecycle.
+
+the init container, post start hook and the pre stop hooks can also be defined in the yaml files.
+
+- init container: the init container is a separate container that executes before the actual container(main container) starts. The init container can be defined under the pod section of the yaml specification. The init container makes sense when we need to do certain things with volumes like creates some directories, set some permissions and so on.
+
+- post start hook: the post start hook starts with the main container and this is generally necessary for running some commands in the main container.
+
+- pre stop hook: similar to post start hook that is used to run commands just before the container is stopped
+
+The liveness probe and readiness probes will only trigger after the `initialDelaySeconds`
+
+When the init container is running the following things happen, if we take a look at the pod state, The PodScheduled will be true, but the pod will not be initialized or ready.
+
+After the post start hook is executed, the initialized condition will be true but the pod will still not be ready
+
+After the readiness probe returns success then all the 3 conditions, initialized, ready and the podscheduled conditions will be true
+
+To check out an example of a yaml file with the init container, post start hooks and pre stop hooks, refer to the lifecycle.yaml file in the root directory
+
+

@@ -1,0 +1,62 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name:  lifecycle
+  labels:
+    name:  helloworld
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app:  lifecycle
+    spec:
+      initContainers: # here this container will run right in the beginning before the main container
+      # starts
+        - name: init
+          image: busybox
+          command: ['sh', '-c', 'sleep 10'] # here the command is only for sleeping for 10 seconds
+      containers:
+      - image:  busybox
+        name:  lifecyle-container
+        command: ['sh', '-c', 'echo $(date +%s): Running >> /timing && echo "The app is running!" && /bin/sleep 120'] # all the commands being executed are essentially for the purpose of observing
+        # the pod lifecycle
+        resources:
+          requests:
+            cpu: "20m"
+            memory: "55M"
+        livenessProbe:
+          exec:
+            command: ['sh', '-c', 'echo $(date +%s): livenessProbe >> /timing']
+          initialDelaySeconds: 35
+          timeoutSeconds: 30
+        readinessProbe:
+          exec:
+            command: ['sh', '-c', 'echo $(date +%s): readinessProbe >> /timing']
+          initialDelaySeconds: 35
+          timeoutSeconds: 10
+        lifecycle:
+          postStart:
+            exec:
+              command: ['sh', '-c', 'echo $(date +%s): postStart >> /timing && sleep 10 && echo $(date +%s): end postStart >> /timing']
+          preStop:
+            exec:
+              command: ['sh', '-c', 'echo $(date +%s): preStop >> /timing && sleep 10']
+        env:
+        - name:  ENVVARNAME
+          value:  ENVVARVALUE       
+        ports:
+        - containerPort:  5000
+          name:  my-name
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      volumes:
+        - name: data
+          emptyDir: {}
+      restartPolicy: Always
+      imagePullPolicy: Always
