@@ -606,4 +606,82 @@ After the readiness probe returns success then all the 3 conditions, initialized
 
 To check out an example of a yaml file with the init container, post start hooks and pre stop hooks, refer to the lifecycle.yaml file in the root directory
 
+### Secrets
 
+Generation of secrets from files
+
+```bash
+echo -n "root" > ./username.txt # the -n flag in echo does not output the trailing new line
+echo -n "password" > ./password.txt
+kubectl create secret generic db-secret --from-file=./username.txt --from-file./password.txt
+```
+This would create a `generic` secret from the 2 files username and password
+
+A secret can also be an ssh key or an ssl certificate
+
+```bash
+kubectl create secret generic ssl-certificate --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
+```
+
+Generation of secrets using yaml definitions
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secret
+type: Opaque
+data:
+  password: cm9vda== # here we are gonna supply b64 strings for instance using echo -n "root" | base64
+  username: cGFzc3dvcmQ=
+```
+
+After creating the yaml file we can just use the following command to create the secret
+```bash
+kubectl create -f <name of the yaml file>
+```
+
+once the secrets are created we can use the secrets in the following ways:
+```yaml
+spec:
+  containers:
+  - name: k8s-demo
+    image: helloworld
+    ports:
+    - containerPort: 3000
+    env:
+    - name: SECRET_USERNAME # using env as secret(this is actually a pretty good way of using secrets)
+      valueFrom: 
+        secretKeyRef:
+          name: db-secret # name of the secret
+          key: username # key in that secret
+    - name SECRET_PASSWORD
+      valueFrom: 
+        secretKeyRef:
+          name: db-secret
+          key: password
+```
+
+We can also use secrets as a file inside the container in the following way:
+```yaml
+spec:
+  containers:
+  - name: k8s-demo
+    image: helloworld
+    ports:
+    - containerPort: 3000
+    volumeMounts:
+    - name: credVolume
+      mountPath: /etc/creds
+      readOnly: true
+    volumes:
+    - name: credVolume
+      secret:  
+        secretName: db-secret
+        # the secrets will be stored here in a file using in the following dir location:
+        # /etc/creds/db-secrets/username
+        # /etc/creds/db-secrets/password
+        # The application can then read those files directly, # however the environment variables 
+        # approach is much better in this regard
+```
+
+[Advanced Topics]()
