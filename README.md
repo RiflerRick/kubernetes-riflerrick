@@ -412,7 +412,7 @@ minikube service <name of the service> --urls
 Note: during creation of a deployment we can use the option `--record` in order to see the changes as well. 
 
 By default the kubernetes deployment revision history is set to 2 which means only 2 entries will be shown in the revision history. We can change that by editing the deployment. We need to add the following key under deployment `spec`
-`revisionHistoryLimit`.s
+`revisionHistoryLimit`.
 
 ### Service
 
@@ -494,3 +494,95 @@ Hello World!$
 $
 ```
 The ip of the service also changes if we create a new service after deleting the old one. It is however also possible to keep that fixed as well
+
+### Labels
+
+just like tags in aws.
+With labels we can have pods deployed on specific nodes and not just any node.
+The first thing to do in such a case would be to add a label or multiple labels to our nodes. 
+```bash
+kubectl label nodes node1 hardware=high-spec
+kubectl label nodes node2 hardware=low-spec
+```
+once the nodes are labelled we can have the pods get deployed to specific nodes, in the following way
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodehelloworld.example.com
+  labels:
+    app: helloworld
+spec:
+  containers:
+  - name: k8s-demo
+    image: wardviaene/k8s-demo
+    ports:
+    - containerPort: 3000
+  nodeSelector: # this is the directive that selects the node with this key value pair
+    hardware: high-spec
+```
+
+### Healthchecks
+
+2 types of ways to run healthchecks
+- running a command in the container periodically
+- periodic checks on a url(http)
+
+Healthchecks in kubernetes can be implemented using the **liveness probe** in the following way:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodehelloworld.example.com
+  labels:
+    app: helloworld
+spec:
+  containers:
+  - name: k8s-demo
+    image: wardviaene/k8s-demo
+    ports:
+    - containerPort: 3000
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 3000
+      initialDelaySeconds: 15 # initial delay
+      timeoutSeconds: 30
+```
+Similarly we have the readiness probe that checks if the pod is ready to take requeuts. If the readiness probe fails then the IP address will be removed from the service until the readiness probe on the pod succeeds. For the livenesss probe, if the liveness probe fails then the container will be restarted.
+
+### Pod state
+
+pods have a status field which find when we do a `kubectl get pods`. When a pod is in the **running** state, it means:
+- the pod has been bound to a node
+- all containers have been created
+- at least one container is still runnning or is starting/restartng
+
+Other valid statuses are:
+- **pending**: the pod has been accepted but is not running. May happen when the container image is still downloading. if the pod cannot be scheduled because of resource constraints it will also be in this status. 
+
+- **succeeded**: All containers in the pod have been terminated and will not be restarted.
+
+- **failed**: All containers in the pod have been terminated and atleast one container returned a failure code. The failure code is simply the exit code of the process when the container terminates.
+
+- **unknown**: This means that the status could not be determined, this might happen when the node on which the pod is supposed to run may be down.
+
+There are 5 different types of pod conditions:
+
+- **PodScheduled**: pod has been scheduled to a node
+- **Ready**: pod is ready to serve requests and is going to added to matching services
+- **Initialized**: initialization containers have been started successfully
+- **Unschedulable**: The pod can't be scheduled may be due to resource constraints
+- **ContainersReady**: All containers in the pod are ready
+
+The **container state** can be got from the following command:
+```bash
+kubectl get pod <pod_name> -o yaml
+```
+The container state can be running, terminated or waiting
+
+### Pod Lifecyle
+
+![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/k8s_pod_lifecycle.png)
+The following diagram shows us the
