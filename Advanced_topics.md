@@ -42,3 +42,137 @@ it is possible to use configmaps as volumes
 it is also possible to use configmaps as environment variables
 
 ## Ingress Controller
+
+Its an alternative to the load balancer(that is also available as a service). Ingress controllers allows us to easily expose services that need to be accessible from outside the cluster.
+
+There are default ingress controllers available and it is also possible to create our own ingress controller.
+
+The way this works any traffic from the internet hits the ingress controller first at whichever port is defined for incoming traffic. The ingress controller is a service that is associated with a pod(that runs a container for instance an nginx container). The ingress controller then passes on the traffic to the respective services. 
+
+An example of an ingress controller can be the following:
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: Ingress # ingress object
+metadata:
+    name: helloworld-rules
+spec:
+    rules:
+    - host: helloworld-v1.example.com
+      http:
+        paths:
+        - path: /
+          backend:
+            serviceName: helloworld-v1 # so basically for the host helloworld-v1.example.com route 
+            # traffic to the path / at the service helloworld-v1 at port 80
+            servicePort: 80
+    - host: helloworld-v2.example.com
+      http:
+        paths:
+        - path: /
+          backend:
+            serviceName: helloworld-v2 # similarly for the other service
+            servicePort: 80
+```
+
+Note that along with the Ingress object it is also necessary to have an ingress controller(which runs as a pod with a container).
+
+The ingress controller only works for HTTP/s protocols.
+
+## External DNS
+
+external dns automatically creates the necessary DNS records in your DNS server(for instance route53). For every hostname that we create in our ingress object it automatically creates a DNS entry in our DNS server.
+
+Note that the external DNS runs as a separate pod altogether.
+
+## Running Stateful apps
+
+### Volumes
+
+Volumes in kubernetes allows us to store data outside the container(similar to docker volumes for instance).
+
+Volumes can be attached using different volume plugins. It is possible to store data in local volumes that exist on the same node. It is also possible to store data on something like EBS(elastic block storage) instances on aws.
+
+If our node stops working, the pod can be rescheduled on another node, the volume(EBS storage for instance) can be then attached to that node automatically. However this only works if the EBS instance is in the same AZ as the nodes themselves.
+
+Creating volumes(aws volumes on EBS) using aws cli:
+
+```bash
+aws ec2 create-volume --size 10 region us-east-1 --availability-zone us-east-1a --volume-type gp2
+```
+10 gb size az us-east-1a.
+
+Once this volume is created it will have a volume id that we need to use for creating the pod's volumes:
+
+```yaml
+spec:
+    containers:
+    .
+    .
+    .
+    volumes:
+    - name: myvol # /myvol now becomes a path inside
+    awsElasticBlockStore:
+        volumeID: <vol id of aws EBS>
+```
+
+### Volumes Autoprovisioning
+
+kubernetes plugins have the capability of provisioning storage for you. This means that the AWS plugin for instance can provision storage for us by creating the volumes in AWS before attaching them to a node.
+
+So we do not need to create a volume manually using awscli anymore. This is done using the StorageClass object.
+
+For instance:
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+    name: standard
+provisioner: kubernetes.io/aws-ebs
+parameters:
+    type: gp2 # general purpose 2
+    zone: us-east-1
+```
+
+Next we need to create a persistent volume claim and specify the size
+
+```yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+    name: myclaim
+    annotations:
+        volume.beta.kubernetes.io/storage-class: "standard" # refers to the standard storage class 
+        # that was created earlier
+spec:
+    accessModes:
+        - ReadWriteOnce # i can have only one EBS volume that I can read and write to at the same time
+        # ReadWriteOnce simply means I can read and write at the same time.
+    resources:
+        requests:
+            storage: 8Gi
+```
+
+Now that we have both the storage class and the persistent volume claim declared we can use the volume in our pods in the following way:
+
+```yaml
+kind: Pod
+.
+.
+.
+spec:
+    containers:
+    - name: myfrontend
+      image: nginx
+      volumeMounts:
+      - mountPath: "/var/www/html"
+        name: mypd
+    volumes:
+    - name: mypd
+    persistentVolumeClaim:
+        claimName: myclaim # this was the exact claim name that was given in the PersistentVolumeClaim 
+        # object
+```
+
+It is also possible to have efs(elastic file system) volumes but they cannot be auto provisioned
