@@ -322,7 +322,6 @@ spec:
 ```
 
 **Concept of weight**
-
 Lets say we have n number of rules and for a particular node, 2 of those rules match with weights 2 and 5. In that case the total score is 2+5=7, lets say for another node 3 of the rules match however the weights of the rules are 2,1 and 3 which leads to a total score of 2+1+3=6. Since the previous node got a higher score, the pod will be scheduled on that node
 
 In addition to the labels that can be added, there are also pre-populated labels that can be added for node matching, for instance:
@@ -338,5 +337,81 @@ We can label a node using the following command:
 
 ```bash
 kubectl label node <node name> env=dev # the label key value pair being env, dev
+```
+
+- Pod affinity and Anti affinity
+
+a good use case of pod affinity and anti affinity would be the following:
+
+- there may be a requirement where one pod needs to be co-located with another pod(i.e in the same node). In such a case scenario we are going to use pod affinity.
+- For instance if we have an app that uses redis as cache then we might want redis to be always in the same node as the pod itself.
+- It is also possible to have pods co-located within the same AZ.
+
+When writing the pod affinity and anti-affinity rules we need to specify a topology domain, called a `topologyKey` in the rules.
+
+The topology key refers to a node label.
+
+If the affinity rule matches then the new pod will only be scheduled on the node that has the same topology Key as the node in which the current pod is running.
+
+![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/k8s-pod-affinity.png)
+
+Lets consider the above scenario. The new pod has an affinity set to the appname which is myapp. This initial match is for matching the pod against which the co-location match is going to be done. Since the selector given here is `app` having values `myapp`. The pod in node 2 is chosen for comparison. However for selecting the node the topologyKey would be used which in this case is the kubernetes hostname that the pod(original) has.
+
+![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/k8s-pod-affinity-2.png)
+
+Similarly a second situation might be for the AZ.
+
+**Pod Anti-Affinity**
+Anti-affinity can be used to make sure that a pod is only scheduled once in a node.
+
+Basically anti-affinity dictates that if a pod label matches, k8s will not schedule on that node. This is basically useful when we are trying to separate pods and avoid running them on the same node.
+
+![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/k8s-pod-anti-affinity.png)
+
+When writing pod affinity rules, its possible to use the following operators:
+
+- In/NotIn (does a label have one of these values)
+- Exists/DoesNotExist (does a label exist or not)
+
+```
+Note: Interpod affinity currently requires a substantial level of processing so if there are too many nodes this feature might be used with caution.
+```
+
+### Taints and Tolerations
+
+Toleration is the opposite of node affinity. Tolerations allow a node to repel a set of pods. Taints mark a node, tolerations are applied to pods to influence the scheduling of pods. 
+
+For instance the master has a taint: `node-role.kubernetes.io/master:NoSchedule`
+
+For adding a new taint on a node you can use:
+
+```bash
+kubectl taint nodes node1 key=value:NoSchedule
+```
+
+The above taint will make sure that no pods are scheduled on node1 unless they have a matching toleration.
+
+For instance if we have a deployment that has a toleration of the form
+
+```yaml
+tolerations:
+- key: "key"
+  operator: "Equal" # we can use Equal(using key and value) or Exists(only using key)
+  value: "value"
+  effect: "NoSchedule"
+```
+
+**NoSchedule**: a hard requirement that a pod will not be scheduled unless there is a matching toleration.
+**PreferNoSchedule**: k8s will try and avoid placing a pod that does not have a matching toleratio but it is not a hard requirement
+**NoExecute**: if this taint is applied, the pods running on that node will be stopped immediately if a matching toleration is not found
+
+```yaml
+tolerations:
+- key: "key"
+  operator: "Equal"
+  value: "value"
+  effect: "NoExecute"
+  tolerationSeconds: 3600 # the pod will run for 3600 seconds before being evicted. If this value
+  # is not given the toleration will match and the pod will keep on running on the tainted node
 ```
 
