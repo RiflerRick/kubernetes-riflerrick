@@ -175,4 +175,168 @@ spec:
         # object
 ```
 
-It is also possible to have efs(elastic file system) volumes but they cannot be auto provisioned
+It is also possible to have efs(elastic file system) volumes but they cannot be auto provisioned.
+
+### Pod Presets
+
+pod presets can inject Kubernetes resources like secrets, configmaps, volumes and environment variables at runtime. 
+
+So lets say we have 20 applications we want to deploy and they all need to get a specific credential. One way to do this would be to edit the deployment of all these 20 applications to have the configmaps and secrets in them or we could have a pod preset which will inject the configmaps and secrets to all matching pods.
+
+When injecting environment variables and volume mounts, the pod preset will apply the changes to all containers within the pod.
+
+Example of a pod preset:
+
+```yaml
+apiVersion: settings.k8s.io/v1alpha1
+kind: PodPreset
+metadata:
+    name: share-credential
+spec:
+    selector:
+        matchLabels:
+            app: myapp
+    env:
+        - name: MY_SECRET
+          value: "12345"
+    volumeMounts:
+        - mountPath: /share
+          name: share-volume
+    volumes:
+        - name: share-volume
+          emptyDir: {}
+```
+It is totally possible to use more than one pod presets and they will all be applied to matching pods. If there is a conflict, the PodPreset will not be applied to the pod
+
+### StatefulSets
+
+StatefulSets were introduced to run stateful applications that need a stable pod hostname(podname). Pods are in general given random names in the fashion `podname-<random string>`. If statefulsets are used pod names will have a sticky identity and the pod names will not change even after the pod is rescheduled. Statefulsets allow stateful apps stable storage with volumes based on their ordinal number(podname-x).
+
+The obvious question that can arise is the application of such a feature. Statefulsets are used in applications where there is a cluster and the application itself needs to know the actual hostname of each and every pod in the cluster. For instance, if we are setting up cassandra as a cluster, cassandra requires the hostname of the nodes(in our case pods) of the cluster as a configuration setting. Now if the hostnames are changing it does not make sense to set up cassandra because it will never work.
+
+### Daemon Sets
+
+DaemonSets ensures that every single node in the k8s cluster runs the same pod resource. This is actually useful if we want to ensure that a certain pod is running on every single kubernetes node. When a node is added to the cluster, a new pod will be started automatically. Similarly when the node is removed, the pod will **not** be rescheduled on another node.
+
+Typical use cases are:
+
+- log aggregation(for having all logs in a central place we would need to have a pod running on each and every node).
+- monitoring
+- load balancers/reverse proxies/API gateways
+- any other use case where we need to have a pod running on every node
+
+### Resource Usage Monitoring
+
+Heapster enables container cluster monitoring and performance analysis. It provides a monitoring platform for kubernetes. It is a pre-requisite if you want to do pod autoscaling in kubernetes. Heapster exports cluster metrics via REST endpoints. There are many different backends that we can use with Heapster. A backend is simply the place where the monitoring data is stored. For instance InfluxDB.
+
+For resource usage monitoring, the yaml files can be found in the github repository of Heapster. 
+
+This is how a typical structure of resource monitoring may look like:
+
+![](https://raw.githubusercontent.com/RiflerRick/kubernetes/master/k8s-resource-monitoring.png)
+
+There is a kubernetes process called cAdvisor that gathers information about the metrics directly from the pod and sends all that information to the heapster pod, heapster is then going to save this to influxDB and after that graphana will be used in order to show all the information
+
+Heapster is however depricated recently and therefore it is better to use something like prometheus to do that
+
+### Horizontal Pod Autoscaling
+
+In kubernetes possible to configure auto scaling of deployments, replication controllers or replica sets.
+
+It is possible to scale based on CPU usage out of the box, however if we want to have custom metrics like average request latency or the queries per second or the like, we need start the cluster with the environment variable `ENABLE_CUSTOM_METRICS` to be true.
+
+Autoscaling will periodically query the utilization for the targeted pods. By default 30 seconds is the time in which the periodic query will happen however it can be changed using the `--horizontal-pod-autoscaler-sync-period` when launching the controller manager in the master node. 
+
+Autoscaling will use heapster the monitoring tool to gather its metrics.
+
+For this to work in our deployment we will have a resource request in the following way:
+
+```yaml
+spec:
+    containers:
+    .
+    .
+    .
+        resources:
+            requests:
+                cpu: 200m
+```
+
+Example of an HPA:
+
+```yaml
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+    name: hpa-example
+spec:
+    scaleTargetRef:
+        apiVersion: extensions/v1beta1
+        kind: Deployment # the deployment needs to scale
+        name: hpa-example
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 50 # 50 percent of the CPU that we requested, so basically since
+    # we requested 200m, the targetCPUUtilization would be 100m
+```
+
+### Affinity/Anti-affinity
+
+Just like we have node selector for scheduling pods on specific nodes, we can have more expressive rules for scheduling pods using affinity/anti-affinity.
+
+It is possible to create rules that are not hard requirements but rather a preferred rule meaning that the scheduler will still be able to schedule the pod even if the rules are not met.
+
+It is possible to have pod affinity as well(other than node affinity). For instance we can have a particular affinity defined that 2 pods will never be on the same node. Affinity and anti-affinity is relevant only during scheduling so for instance if we have a pod that is already running and we spin up a node that turns out to be a better match for the pod, the pod will not get automatically scheduled to the other node, we would need to manually delete the pod and create it again.
+
+- Node affinity:
+
+    - **requiredDuringSchedulingIgnoredDuringExecution**: hard requirement. rules need to be met before the pod could be scheduled
+
+    - **preferredDuringSchedulingIgnoredDuringExecution**: a little more loose requirement. This will try to enfore the rule but not actually gurantee it.
+
+Affinity can be defined in the deployment spec itself:
+
+```yaml
+spec:
+    affinity:
+        nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                    - key: env
+                      operator: In
+                      values:
+                      - dev
+            preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 1 # the higher the weight the more preference is given to that rule
+                  preference:
+                    matchExpressions:
+                    - key: team
+                      operator: In
+                      values: 
+                      - engineering-project1
+    containers:
+    .
+    .
+    .
+```
+
+**Concept of weight**
+
+Lets say we have n number of rules and for a particular node, 2 of those rules match with weights 2 and 5. In that case the total score is 2+5=7, lets say for another node 3 of the rules match however the weights of the rules are 2,1 and 3 which leads to a total score of 2+1+3=6. Since the previous node got a higher score, the pod will be scheduled on that node
+
+In addition to the labels that can be added, there are also pre-populated labels that can be added for node matching, for instance:
+
+- kubernetes.io/hostname
+- failure-domain.beta.kubernetes.io/zone
+- failure-domain.beta.kubernetes.io/region
+- beta.kubernetes.io/instance-type
+- beta.kubernetes.io/os
+- beta.kubernetes.io/arch
+
+We can label a node using the following command:
+
+```bash
+kubectl label node <node name> env=dev # the label key value pair being env, dev
+```
+
