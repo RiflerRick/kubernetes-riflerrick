@@ -65,3 +65,28 @@ Once this is done, we are all set, A new context has been created.
 The default permission that is given to a new user is no permissions at all.
 
 This ends the part of authentication, now we can focus on authorization. 
+
+### Authorization
+
+For authorization, there are essentially 3 things in kubernetes:
+- subjects, they can be humans or running processes or the like
+- API resources, that can be pods, deployments, daemon sets, pvcs, namespaces etc
+- verbs: get, list, watch, create, patch, delete etc
+
+In kubernetes, there are roles and role bindings, 
+
+Roles are used to combine API resources to verbs. So for instance, we can create a role called pod-readers that can only perform `list`,  `get` and `watch` operations on the `pod` resource. 
+
+Here is an example of a role:
+```yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  namespace: test
+  name: pod-access
+rules:
+  apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+```
+This above role will allow get and list access of all pods in the test namespace
